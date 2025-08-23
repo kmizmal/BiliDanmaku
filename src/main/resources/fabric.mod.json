@@ -1,0 +1,41 @@
+{
+	"schemaVersion": 1,
+	"id": "bilidanmaku",
+	"version": "${version}",
+	"name": "biliDanmaku",
+	"description": "设置身份码获取b站直播间数据（当前只支持弹幕信息，问就是还没写完",
+	"authors": [
+		"zmal"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/bilidanmaku/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			{
+				"value": "com.zmal.bilidanmaku.BiliDanmaku",
+				"adapter": "kotlin"
+			}
+		],
+		"client": [
+			{
+				"value": "com.zmal.bilidanmaku.BiliDanmakuClient",
+				"adapter": "kotlin"
+			}
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.17.2",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*",
+		"fabric-language-kotlin": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}
