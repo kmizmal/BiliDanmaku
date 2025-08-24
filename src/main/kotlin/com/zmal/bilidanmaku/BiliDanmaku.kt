@@ -1,41 +1,27 @@
 package com.zmal.bilidanmaku
 
 import com.mojang.brigadier.arguments.StringArgumentType
+import com.mojang.brigadier.context.CommandContext
+import com.zmal.bilidanmaku.Utils.cli
+import com.zmal.bilidanmaku.Utils.currentIdCode
+import com.zmal.bilidanmaku.Utils.initBiliClient
+import com.zmal.bilidanmaku.Utils.reloadClient
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
-import net.fabricmc.fabric.api.networking.v1.PacketSender
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.command.CommandManager
-import net.minecraft.server.network.ServerPlayerEntity
-import net.minecraft.server.network.ServerPlayNetworkHandler
+import net.minecraft.server.command.ServerCommandSource
 import net.minecraft.text.Text
 import org.slf4j.LoggerFactory
-import java.util.concurrent.CompletableFuture
 
 
 @Suppress("SpellCheckingInspection")
 object BiliDanmaku : ModInitializer {
     private val logger = LoggerFactory.getLogger("bilidanmaku")
-    private lateinit var cli: BiliClient
-    private var currentIdCode: String = ""
     private var server: MinecraftServer? = null
 
-    private const val FIXED_APP_ID = 1760270800600
-    private const val FIXED_KEY = "15TFVHJi774HSW6YAmQ4toxn"
-    private const val FIXED_SECRET = "pVLu5MS0FsH5X2bfOscdcHrqQUbXEJ"
-    private const val FIXED_HOST = "https://live-open.biliapi.com"
-
     override fun onInitialize() {
-        Runtime.getRuntime().addShutdownHook(Thread {
-            try {
-                if (::cli.isInitialized) {
-                    cli.close()
-                }
-            } catch (e: Exception) {
-                logger.error("Error during shutdown: ${e.message}", e)
-            }
-        })
 
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
             dispatcher.register(
@@ -44,133 +30,77 @@ object BiliDanmaku : ModInitializer {
                         CommandManager.literal("reload")
                             .executes { context ->
                                 server = context.source.server
-                                val newConfig = ConfigManager.forceReload()
-                                if (currentIdCode != newConfig.idCode) {
-                                    if (::cli.isInitialized) cli.close()
-                                    initBiliClient()
-                                    sendFeedback("BiliClient 配置已重载并重新连接")
-                                } else {
-                                    sendFeedback("BiliClient 配置已重载（无变化）")
-                                }
+                                if (reloadClient()) sendFeedback("BiliClient 配置已重载并重新连接",context)
+
                                 1
                             }
                     )
                     .then(
-                        CommandManager.literal("status")
-                            .executes { context ->
+                        CommandManager.literal("").executes { context ->
                                 server = context.source.server
-                                if (::cli.isInitialized) {
-                                    sendFeedback(cli.getStatus())
-                                } else {
-                                    sendFeedback("BiliClient 未初始化")
-                                }
+                                sendFeedback(cli.getStatus(),context)
                                 1
-                            }
-                    )
+                            })
+//                    .then(
+//                        CommandManager.literal("reconnect")
+//                            .executes { context ->
+//                                server = context.source.server
+//                                if (::cli.isInitialized) {
+//                                    cli.close()
+//                                    cli.run()
+//                                    sendFeedback("BiliClient 正在重新连接")
+//                                } else {
+//                                    initBiliClient()
+//                                    sendFeedback("BiliClient 已初始化并连接")
+//                                }
+//                                1
+//                            }
+//                    )
                     .then(
-                        CommandManager.literal("reconnect")
-                            .executes { context ->
-                                server = context.source.server
-                                if (::cli.isInitialized) {
-                                    cli.close()
-                                    cli.run()
-                                    sendFeedback("BiliClient 正在重新连接")
-                                } else {
-                                    initBiliClient()
-                                    sendFeedback("BiliClient 已初始化并连接")
-                                }
-                                1
-                            }
-                    )
-                    .then(
-                        CommandManager.literal("setid")
-                            .then(
-                                CommandManager.argument("idCode", StringArgumentType.string())
-                                    .executes { context ->
-                                        val idCode = StringArgumentType.getString(context, "idCode")
-                                        server = context.source.server
-                                        if (ConfigManager.updateIdCode(idCode)) {
-                                            currentIdCode = idCode
-                                            if (::cli.isInitialized) cli.close()
-                                            initBiliClient()
-                                            sendFeedback("ID Code 已更新并重新连接")
-                                        } else {
-                                            sendFeedback("ID Code 更新失败")
-                                        }
-                                        1
+                        CommandManager.literal("setid").then(
+                            CommandManager.argument("idCode", StringArgumentType.string()).executes { context ->
+                                    val idCode = StringArgumentType.getString(context, "idCode")
+                                    server = context.source.server
+                                    if (ConfigManager.updateIdCode(idCode)) {
+                                        currentIdCode = idCode
+                                        initBiliClient()
+                                        sendFeedback("ID Code 已更新并重新连接",context)
+                                    } else {
+                                        sendFeedback("ID Code 更新失败",context)
                                     }
-                            )
-                    )
+                                    1
+                                })))
+            dispatcher.register(
+                CommandManager.literal("bdm").redirect(dispatcher.getRoot().getChild("bilidanmaku"))
             )
         }
 
-        ServerPlayConnectionEvents.JOIN.register { _: ServerPlayNetworkHandler?, _: PacketSender?, minecraftServer: MinecraftServer? ->
-            minecraftServer?.let {
-                server = it
-                initBiliClient()
-            }
+        // 服务器启动完成
+        ServerLifecycleEvents.SERVER_STARTED.register { minecraftServer ->
+            server = minecraftServer
+            initBiliClient()
+            logger.info("注册服务端实例ServerLifecycleEvents")
         }
 
-        ServerPlayConnectionEvents.DISCONNECT.register { _: ServerPlayNetworkHandler?, _: MinecraftServer? ->
-            if (::cli.isInitialized) cli.close()
+        // 服务器关闭时
+        ServerLifecycleEvents.SERVER_STOPPING.register { _ ->
+            cli.close()
         }
     }
 
-    fun sendFeedback(message: String) {
-        server?.execute {
-            for (player: ServerPlayerEntity in server!!.playerManager.playerList) {
-                player.sendMessage(Text.literal("[BiliDanmaku] $message"), false)
-            }
-        }
-        logger.info(message)
+    fun sendFeedback(message: String, ctx: CommandContext<ServerCommandSource>) {
+        val text = Text.literal("[BiliDanmaku] $message")
+        ctx.getSource().sendFeedback({ text }, false)
     }
-    fun sendFeedback(msg: Text){
-        server?.execute {
-            for (player: ServerPlayerEntity in server!!.playerManager.playerList) {
-                player.sendMessage(msg, false)
-            }
+
+    fun sendFeedback(msg: Text) {
+        val mcServer = server ?: return
+        mcServer.execute {
+            val text = Text.literal("[BiliDanmaku] $msg")
+            mcServer.playerManager.broadcast(text, false)
         }
         logger.info(msg.string)
     }
 
-    private fun initBiliClient() {
-        try {
-            currentIdCode = ConfigManager.getIdCode()
 
-            if (currentIdCode.isEmpty()) {
-                logger.warn("ID Code is empty, BiliClient will not be initialized")
-                return
-            }
-
-            cli = BiliClient(
-                currentIdCode,
-                FIXED_APP_ID,
-                FIXED_KEY,
-                FIXED_SECRET,
-                FIXED_HOST
-            )
-
-            CompletableFuture.runAsync {
-                try {
-                    cli.run()
-                    if (!cli.isConnected()) {
-                        logger.warn("Initial connection failed, attempting reconnect...")
-                        Thread.sleep(2000)
-                        cli.reload()
-                    }
-                    if (cli.isConnected()) {
-                        logger.info("BiliClient connected successfully")
-                    } else {
-                        logger.error("BiliClient failed to connect after retry")
-                    }
-
-                } catch (e: Exception) {
-                    logger.error("Error during BiliClient initialization: ${e.message}", e)
-                }
-            }
-
-        } catch (e: Exception) {
-            logger.error("Failed to initialize BiliClient: ${e.message}", e)
-        }
-    }
 }

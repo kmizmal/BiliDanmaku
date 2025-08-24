@@ -59,9 +59,10 @@ class Proto {
             if (buf.size >= packetLen) {
                 body = buf.copyOfRange(headerLen, packetLen)
 
-                if (ver == 0.toShort()) {
-                    println("====> callback: ${getBodyAsString()}")
-                }
+//                if (ver == 0.toShort()) {
+//                    if (op!=3)
+//                    println("====> callback:op=$op ${getBodyAsString()}")
+//                }
             } else {
                 println("包体数据不完整")
                 return false
