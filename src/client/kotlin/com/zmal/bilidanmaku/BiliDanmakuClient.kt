@@ -3,6 +3,7 @@ package com.zmal.bilidanmaku
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.zmal.bilidanmaku.Utils.cli
 import com.zmal.bilidanmaku.Utils.initBiliClient
+import com.zmal.bilidanmaku.Utils.logger
 import com.zmal.bilidanmaku.Utils.reloadClient
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument
@@ -27,30 +28,27 @@ object BiliDanmakuClient : ClientModInitializer {
         // 注册客户端命令
         ClientCommandRegistrationCallback.EVENT.register { dispatcher, _ ->
             dispatcher.register(
-                literal("bilidanmaku")
-                    .then(literal("reload").executes {
-                        reloadClient()
-                        sendClientFeedback("BiliClient 配置已重载并重新连接")
-                        1
-                    })
-                    .then(literal("status").executes {
-                        sendClientFeedback(cli.getStatus())
-                        1
-                    })
-                    .then(
-                        literal("setid").then(
-                            argument("idCode", StringArgumentType.string()).executes { context ->
-                                val idCode = StringArgumentType.getString(context, "idCode")
-                                if (ConfigManager.updateIdCode(idCode)) {
-                                    currentIdCode = idCode
-                                    reloadClient()
-                                    sendClientFeedback("ID Code 已更新并重新连接")
-                                } else {
-                                    sendClientFeedback("ID Code 更新失败")
-                                }
-                                1
-                            })
-                    )
+                literal("bilidanmaku").then(literal("reload").executes {
+                    reloadClient(true)
+                    sendClientFeedback("BiliClient 配置已重载并重新连接")
+                    1
+                }).then(literal("status").executes {
+                    sendClientFeedback(cli.getStatus())
+                    1
+                }).then(
+                    literal("setid").then(
+                        argument("idCode", StringArgumentType.string()).executes { context ->
+                            val idCode = StringArgumentType.getString(context, "idCode")
+                            if (ConfigManager.updateIdCode(idCode)) {
+                                currentIdCode = idCode
+                                reloadClient(true)
+                                sendClientFeedback("ID Code 已更新并重新连接")
+                            } else {
+                                sendClientFeedback("ID Code 更新失败")
+                            }
+                            1
+                        })
+                )
             )
             dispatcher.register(
                 literal("bdm").redirect(dispatcher.getRoot().getChild("bilidanmaku"))
@@ -58,8 +56,8 @@ object BiliDanmakuClient : ClientModInitializer {
         }
         ClientEntityEvents.ENTITY_LOAD.register(ClientEntityEvents.Load { entity: Entity?, _: ClientWorld? ->
             if (entity is PlayerEntity) {
-                initBiliClient()
-                println("客户端初始化")
+                initBiliClient(true)
+                logger.info("注册服务端实例ClientEntityEvents")
             }
         })
         // 断线或客户端退出时关闭连接
@@ -67,7 +65,14 @@ object BiliDanmakuClient : ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STOPPING.register { cli.close() }
     }
 
-    private fun sendClientFeedback(message: String) {
+    fun sendClientFeedback(msg: Text) {
+        val mc = MinecraftClient.getInstance()
+        mc.execute {
+            mc.inGameHud.chatHud.addMessage(msg)
+        }
+    }
+
+    fun sendClientFeedback(message: String) {
         val mc = MinecraftClient.getInstance()
         mc.execute {
             mc.inGameHud.chatHud.addMessage(Text.literal("[BiliDanmakucli] $message"))

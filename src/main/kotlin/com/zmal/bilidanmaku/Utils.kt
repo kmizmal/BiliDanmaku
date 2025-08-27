@@ -7,12 +7,13 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.random.Random
 
-@Suppress("SpellCheckingInspection")
 object Utils {
     val logger = LoggerFactory.getLogger("bilidanmaku")!!
     var currentIdCode: String = ""
     private const val FIXED_APP_ID = 1760270800600
+    @Suppress("SpellCheckingInspection")
     private const val FIXED_KEY = "15TFVHJi774HSW6YAmQ4toxn"
+    @Suppress("SpellCheckingInspection")
     private const val FIXED_SECRET = "pVLu5MS0FsH5X2bfOscdcHrqQUbXEJ"
     private const val FIXED_HOST = "https://live-open.biliapi.com"
 
@@ -46,12 +47,12 @@ object Utils {
 
     lateinit var cli: BiliClient
 
-    fun initBiliClient() {
+    fun initBiliClient(isClient: Boolean) {
         try {
             currentIdCode = ConfigManager.getIdCode()
             if(this::cli.isInitialized)return
             cli = BiliClient(
-                currentIdCode, FIXED_APP_ID,FIXED_HOST
+                currentIdCode, FIXED_APP_ID,FIXED_HOST, isClient
             )
             CompletableFuture.runAsync{
                 cli.run()
@@ -62,7 +63,7 @@ object Utils {
             logger.error("Failed to initialize BiliClient: ${e.message}", e)
         }
     }
-    fun reloadClient() : Boolean{
+    fun reloadClient(isClient: Boolean) : Boolean{
         try {
             // 如果 cli 已经初始化并运行，可以先做一些清理
             if (this::cli.isInitialized) {
@@ -76,7 +77,7 @@ object Utils {
 
             // 重新获取 idCode 并初始化
             currentIdCode = ConfigManager.getIdCode()
-            cli = BiliClient(currentIdCode, FIXED_APP_ID, FIXED_HOST)
+            cli = BiliClient(currentIdCode, FIXED_APP_ID, FIXED_HOST, isClient)
 
             // 异步运行客户端
             CompletableFuture.runAsync {
