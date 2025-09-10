@@ -12,12 +12,12 @@ base {
 }
 
 repositories {
-    maven {
-        url 'https://maven.aliyun.com/nexus/content/groups/public'
-    }
-    maven {
-        url 'https://repository.hanbings.io/proxy'
-    }
+//    maven {
+//        url 'https://maven.aliyun.com/nexus/content/groups/public'
+//    }
+//    maven {
+//        url 'https://repository.hanbings.io/proxy'
+//    }
 }
 
 loom {
@@ -26,7 +26,6 @@ loom {
 	mods {
 		"bilidanmaku" {
 			sourceSet sourceSets.main
-			sourceSet sourceSets.client
 		}
 	}
 

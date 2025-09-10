@@ -11,19 +11,13 @@
 		"homepage": "https://fabricmc.net/",
 		"sources": "https://github.com/kmizmal/BiliDanmaku"
 	},
-	"license": "CC0-1.0",
+	"license": "GPLv3",
 	"icon": "assets/bilidanmaku/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
 			{
 				"value": "com.zmal.bilidanmaku.BiliDanmaku",
-				"adapter": "kotlin"
-			}
-		],
-		"client": [
-			{
-				"value": "com.zmal.bilidanmaku.BiliDanmakuClient",
 				"adapter": "kotlin"
 			}
 		]
